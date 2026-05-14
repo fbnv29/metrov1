@@ -986,8 +986,8 @@ h2 {
 
 .add-song-panel {
   gap: 8px;
-  padding: 12px;
-  grid-template-rows: auto minmax(118px, 1fr);
+  padding: 12px 12px 16px;
+  grid-template-rows: auto auto;
 }
 
 .add-song-panel > .panel-title {
@@ -999,7 +999,7 @@ h2 {
 }
 
 .add-song-panel {
-  align-content: stretch;
+  align-content: start;
   overflow: hidden;
 }
 
@@ -1009,24 +1009,16 @@ h2 {
 }
 
 .add-card {
-  grid-template-columns: minmax(0, 1fr) minmax(176px, 0.28fr);
-  align-content: stretch;
-  align-items: stretch;
-  gap: 12px;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.add-fields {
-  display: grid;
-  grid-template-columns: minmax(92px, 0.7fr) minmax(118px, 0.82fr) minmax(90px, 0.72fr) minmax(130px, 1fr);
-  gap: 8px 12px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
   align-content: center;
   align-items: end;
-  min-width: 0;
+  gap: 10px 12px;
+  align-self: start;
+  height: auto;
   min-height: 0;
-  padding: 8px 10px;
+  overflow: hidden;
+  padding: 12px 14px;
   border: 1px solid rgba(244, 241, 234, 0.055);
   border-radius: 10px;
   background:
@@ -1035,51 +1027,119 @@ h2 {
   box-shadow: var(--shadow-inset);
 }
 
+.add-fields {
+  display: contents;
+}
+
 .add-fields > label:nth-child(1) {
-  grid-column: 1 / 3;
+  grid-column: 1 / 5;
+  grid-row: 1;
 }
 
 .add-fields > label:nth-child(2) {
-  grid-column: 3 / 5;
+  grid-column: 5 / 9;
+  grid-row: 1;
 }
 
 .add-fields > label:nth-child(3) {
-  grid-column: 1;
+  grid-column: 1 / 3;
+  grid-row: 2;
   max-width: none;
 }
 
 .add-fields > label:nth-child(4) {
-  grid-column: 2;
+  grid-column: 3 / 5;
+  grid-row: 2;
 }
 
 .add-fields > label:nth-child(5) {
-  grid-column: 3 / 5;
+  grid-column: 5 / 9;
+  grid-row: 2;
 }
 
 .add-card > button[type="submit"] {
-  grid-column: 2;
+  grid-column: 9 / 13;
+  grid-row: 1 / 3;
   align-self: stretch;
+  justify-self: stretch;
+  height: auto;
   min-height: 0;
-  padding-inline: 16px;
+  margin-top: 0;
+  padding-inline: 18px;
   white-space: nowrap;
-  font-size: 0.98rem;
+  font-size: 1rem;
   letter-spacing: 0;
 }
 
 .add-song-panel input,
 .add-song-panel select {
-  min-height: 34px;
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  min-height: 0;
   border-radius: 8px;
-  font-size: 0.88rem;
+  font-size: 1rem;
   font-weight: 700;
+  line-height: 1;
 }
 
 .add-song-panel label {
-  gap: 3px 6px;
+  gap: 2px 6px;
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.03em;
+  line-height: 1;
+  min-height: 0;
+  align-content: start;
+}
+
+.add-song-panel input[type="number"] {
+  appearance: textfield;
+}
+
+.add-song-panel input[type="number"]::-webkit-outer-spin-button,
+.add-song-panel input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+@media (max-width: 1240px) and (min-width: 981px) {
+  .add-card {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    grid-template-rows: repeat(3, minmax(0, auto));
+  }
+
+  .add-card > button[type="submit"] {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    min-height: 46px;
+  }
+
+  .add-fields > label:nth-child(1) {
+    grid-column: 1 / 5;
+    grid-row: 1;
+  }
+
+  .add-fields > label:nth-child(2) {
+    grid-column: 5 / 9;
+    grid-row: 1;
+  }
+
+  .add-fields > label:nth-child(3) {
+    grid-column: 1 / 3;
+    grid-row: 2;
+  }
+
+  .add-fields > label:nth-child(4) {
+    grid-column: 3 / 5;
+    grid-row: 2;
+  }
+
+  .add-fields > label:nth-child(5) {
+    grid-column: 5 / 9;
+    grid-row: 2;
+  }
 }
 
 .search {

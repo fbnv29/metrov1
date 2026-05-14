@@ -1,11 +1,11 @@
-const CACHE = "metronomo-live-v75";
+const CACHE = "metronomo-live-v82";
 const ASSETS = [
   "./",
   "./index.html",
   "./assets/cbc-mark.png",
   "./supabase-config.js",
   "./styles.css",
-  "./styles.css?v=58",
+  "./styles.css?v=65",
   "./app.js",
   "./app.js?v=25",
   "./manifest.webmanifest",
