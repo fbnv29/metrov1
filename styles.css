@@ -650,6 +650,33 @@ h2 {
   font-weight: 700;
 }
 
+.save-tempo-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: min(100%, 190px);
+  min-height: 32px;
+  margin-top: 8px;
+  padding: 0 13px;
+  border-radius: 999px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.16), transparent 42%),
+    var(--cta);
+  border-color: rgba(254, 103, 51, 0.86);
+  color: #130603;
+  font-size: 0.76rem;
+  font-weight: 850;
+  box-shadow:
+    3px 5px 11px rgba(0, 0, 0, 0.38),
+    inset 1px 1px 4px rgba(255, 255, 255, 0.18),
+    inset -3px -3px 7px rgba(0, 0, 0, 0.2);
+}
+
+.save-tempo-button .material-symbols-rounded {
+  font-size: 1rem;
+}
+
 .tempo-step {
   position: relative;
   width: 42px;

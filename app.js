@@ -101,6 +101,7 @@ const el = {
   audioOutputDevices: document.querySelector("#audioOutputDevices"),
   tempoUp: document.querySelector("#tempoUp"),
   tempoDown: document.querySelector("#tempoDown"),
+  saveTempoButton: document.querySelector("#saveTempoButton"),
   nudgeUp: document.querySelector("#nudgeUp"),
   nudgeDown: document.querySelector("#nudgeDown"),
   tempoScaleControls: document.querySelector("#tempoScaleControls"),
@@ -923,6 +924,10 @@ function renderStage() {
   el.subdivisionReadout.textContent = subdivisionLabels[state.subdivision];
   el.pendingReadout.textContent = pending ? `Cambio al cierre: ${pending.name}` : "";
   el.bpmInput.value = state.bpm;
+  const hasUnsavedTempo = Boolean(song) && Number(song.bpm) !== Number(state.bpm);
+  el.saveTempoButton.hidden = !hasUnsavedTempo;
+  el.saveTempoButton.disabled = !hasUnsavedTempo;
+  el.saveTempoButton.setAttribute("aria-hidden", String(!hasUnsavedTempo));
   el.signatureInput.value = state.signature;
   el.subdivisionInput.value = state.subdivision;
   el.customBeats.value = state.customBeats;
@@ -1299,16 +1304,24 @@ function renderMidiMap() {
   );
 }
 
-async function persistCurrentSongFromStage() {
+function getCurrentStageSong({ includeTempo = false } = {}) {
   const current = songs.find((song) => song.id === selectedId);
-  if (!current) return;
-  Object.assign(current, {
-    bpm: state.bpm,
+  if (!current) return null;
+  return {
+    ...current,
+    bpm: includeTempo ? state.bpm : current.bpm,
     signature: state.signature,
     custom_beats: state.signature === "custom" ? state.customBeats : null,
     subdivision: state.subdivision,
     accents: [...state.accents],
-  });
+  };
+}
+
+async function persistCurrentSongFromStage({ includeTempo = false } = {}) {
+  const current = songs.find((song) => song.id === selectedId);
+  const staged = getCurrentStageSong({ includeTempo });
+  if (!current || !staged) return;
+  Object.assign(current, staged);
   window.clearTimeout(pendingStageSaveTimer);
   pendingStageSaveTimer = window.setTimeout(async () => {
     const saved = await saveSongLocal(current, { queueSync: true });
@@ -1377,12 +1390,15 @@ function handleTapTempo() {
   const intervals = tapHistory.slice(1).map((time, index) => time - tapHistory[index]);
   const average = intervals.reduce((sum, item) => sum + item, 0) / intervals.length;
   state.bpm = Math.round(Math.min(260, Math.max(30, 60000 / average)));
-  persistCurrentSongFromStage();
+  renderAll();
+}
+
+function updateTempoDraft() {
+  state.bpm = Number(el.bpmInput.value);
   renderAll();
 }
 
 function updateStageSetting() {
-  state.bpm = Number(el.bpmInput.value);
   state.signature = el.signatureInput.value;
   state.customBeats = Number(el.customBeats.value);
   state.subdivision = el.subdivisionInput.value;
@@ -1393,7 +1409,17 @@ function updateStageSetting() {
 
 function adjustBpm(amount) {
   state.bpm = Math.min(260, Math.max(30, state.bpm + amount));
-  persistCurrentSongFromStage();
+  renderAll();
+}
+
+async function saveTempoDraft() {
+  const current = songs.find((song) => song.id === selectedId);
+  const staged = getCurrentStageSong({ includeTempo: true });
+  if (!current || !staged || Number(current.bpm) === Number(state.bpm)) return;
+  window.clearTimeout(pendingStageSaveTimer);
+  const saved = await saveSongLocal(staged, { queueSync: true });
+  Object.assign(current, saved);
+  setStorageStatus("Modo Local");
   renderAll();
 }
 
@@ -1639,6 +1665,7 @@ function bindEvents() {
   el.tapTempo.addEventListener("click", handleTapTempo);
   el.tempoUp.addEventListener("click", () => adjustBpm(1));
   el.tempoDown.addEventListener("click", () => adjustBpm(-1));
+  el.saveTempoButton.addEventListener("click", saveTempoDraft);
   el.nudgeUp.addEventListener("pointerdown", () => nudge(3));
   el.nudgeDown.addEventListener("pointerdown", () => nudge(-3));
   el.tempoScaleControls.addEventListener("click", (event) => {
@@ -1646,7 +1673,7 @@ function bindEvents() {
     if (!button) return;
     setTempoScale(Number(button.dataset.scale));
   });
-  el.bpmInput.addEventListener("input", updateStageSetting);
+  el.bpmInput.addEventListener("input", updateTempoDraft);
   el.signatureInput.addEventListener("change", updateStageSetting);
   el.subdivisionInput.addEventListener("change", updateStageSetting);
   el.customBeats.addEventListener("input", updateStageSetting);
