@@ -4,6 +4,12 @@ const DB_NAME = "metronomo-live";
 const DB_VERSION = 2;
 const STORE = "songs";
 const SYNC_RETRY_MS = 45000;
+const STORAGE_KEYS = {
+  bankView: "bankView",
+  midiMap: "midiMap",
+  setlistOrder: "setlistOrder",
+  audioOutput: "audioOutput",
+};
 
 const subdivisionLabels = {
   quarter: "negra",
@@ -33,30 +39,12 @@ const midiActions = [
 const seedSongs = [
   {
     id: crypto.randomUUID(),
-    name: "Firmes y adelante",
-    artist: "Set inicial",
-    bpm: 120,
+    name: "Danzando",
+    artist: "Gateway Worship Español",
+    bpm: 95,
     signature: "4/4",
-    subdivision: "quarter",
-    accents: [2, 1, 1, 1],
-  },
-  {
-    id: crypto.randomUUID(),
-    name: "Santo",
-    artist: "Adoración",
-    bpm: 72,
-    signature: "6/8",
     subdivision: "eighth",
-    accents: [2, 1, 1, 2, 1, 1],
-  },
-  {
-    id: crypto.randomUUID(),
-    name: "Cierre",
-    artist: "Ministerio",
-    bpm: 96,
-    signature: "3/4",
-    subdivision: "quarter",
-    accents: [2, 1, 1],
+    accents: [2, 1, 1, 1],
   },
 ];
 
@@ -125,11 +113,16 @@ let selectedId = null;
 let pendingId = null;
 let search = "";
 let bankSearch = "";
-let bankView = localStorage.getItem("bankView") || "active";
+let bankView = ["active", "archived"].includes(localStorage.getItem(STORAGE_KEYS.bankView))
+  ? localStorage.getItem(STORAGE_KEYS.bankView)
+  : "active";
 let draggedSongId = null;
 let learningAction = null;
-let midiMap = JSON.parse(localStorage.getItem("midiMap") || "{}");
-let setlistOrder = JSON.parse(localStorage.getItem("setlistOrder") || "[]");
+const storedMidiMap = readJsonStorage(STORAGE_KEYS.midiMap, {}, isPlainObject);
+const storedSetlistOrder = readJsonStorage(STORAGE_KEYS.setlistOrder, [], Array.isArray);
+let midiMap = storedMidiMap.value;
+let setlistOrder = storedSetlistOrder.value;
+let setlistHasStoredOrder = storedSetlistOrder.valid;
 let tapHistory = [];
 const storedAudioOutput = parseStoredAudioOutput();
 let syncTimer = null;
@@ -152,6 +145,26 @@ const state = {
   accents: [2, 1, 1, 1],
   tempoScale: 1,
 };
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function readJsonStorage(key, fallback, validate = () => true) {
+  const raw = localStorage.getItem(key);
+  if (raw === null) {
+    return { value: fallback, found: false, valid: false };
+  }
+
+  try {
+    const value = JSON.parse(raw);
+    if (!validate(value)) throw new Error(`Invalid ${key}`);
+    return { value, found: true, valid: true };
+  } catch {
+    localStorage.removeItem(key);
+    return { value: fallback, found: true, valid: false };
+  }
+}
 
 class AudioMetronome {
   constructor() {
@@ -732,23 +745,19 @@ async function replaceLocalSongsFromSupabase(remoteSongs) {
   const pending = localSongs.filter((song) =>
     ["dirty", "deleted", "purged"].includes(song.sync_status),
   );
-  const pendingIds = new Set(pending.map((song) => song.id));
+  const localOnlyDirty = pending.filter((song) => song.sync_status === "dirty");
 
   await clearSongRecords();
   await Promise.all(remoteSongs.map((song) => saveSongRecord(song)));
-  await Promise.all(
-    pending
-      .filter((song) => !pendingIds.has(song.id) || !["deleted", "purged"].includes(song.sync_status))
-      .map(saveSongRecord),
-  );
+  await Promise.all(localOnlyDirty.map(saveSongRecord));
 }
 
 async function refreshSongsFromLocal() {
   songs = await getActiveSongs();
   archivedSongs = await getArchivedSongs();
   reconcileSetlistOrder();
-  if (!songs.some((song) => song.id === selectedId)) {
-    selectedId = setlistOrder[0] || songs[0]?.id || null;
+  if (!setlistOrder.includes(selectedId)) {
+    selectedId = setlistOrder[0] || null;
     pendingId = null;
     if (selectedId) applySongState(songs.find((song) => song.id === selectedId));
   }
@@ -775,20 +784,23 @@ async function syncWithSupabase() {
 }
 
 function reconcileSetlistOrder() {
+  if (!songs.length) return;
+
   const songIds = new Set(songs.map((song) => song.id));
   const knownIds = setlistOrder.filter((id) => songIds.has(id));
-  if (knownIds.length) {
-    setlistOrder = knownIds;
-  } else {
+  if (!setlistHasStoredOrder && !knownIds.length && songs.length) {
     setlistOrder = songs
       .sort((a, b) => a.name.localeCompare(b.name, "es"))
       .map((song) => song.id);
+  } else {
+    setlistOrder = knownIds;
   }
   saveSetlistOrder();
 }
 
 function saveSetlistOrder() {
-  localStorage.setItem("setlistOrder", JSON.stringify(setlistOrder));
+  setlistHasStoredOrder = true;
+  localStorage.setItem(STORAGE_KEYS.setlistOrder, JSON.stringify(setlistOrder));
 }
 
 function applySong(id, quantized = false) {
@@ -855,7 +867,7 @@ function fillForm(song) {
   el.nameInput.value = song.name;
   el.artistInput.value = song.artist || "";
   el.formBpmInput.value = song.bpm;
-  el.formSignatureInput.value = song.signature === "custom" ? "4/4" : song.signature;
+  el.formSignatureInput.value = song.signature || "4/4";
   el.formSubdivisionInput.value = song.subdivision;
 }
 
@@ -877,7 +889,7 @@ function closeEditForm() {
   el.nameInput.value = "";
   el.artistInput.value = "";
   el.formBpmInput.value = state.bpm;
-  el.formSignatureInput.value = state.signature === "custom" ? "4/4" : state.signature;
+  el.formSignatureInput.value = state.signature || "4/4";
   el.formSubdivisionInput.value = state.subdivision;
   el.songForm.hidden = true;
 }
@@ -1223,7 +1235,7 @@ async function archiveSongFromBank(id) {
   removeSongFromSetlist(id);
   songs = await getActiveSongs();
   if (selectedId === id) {
-    selectedId = setlistOrder[0] || songs[0]?.id || null;
+    selectedId = setlistOrder[0] || null;
     if (selectedId) applySongState(songs.find((item) => item.id === selectedId));
   }
   renderAll();
@@ -1246,7 +1258,7 @@ async function restoreArchivedSong(id) {
   songs = await getActiveSongs();
   archivedSongs = await getArchivedSongs();
   bankView = "active";
-  localStorage.setItem("bankView", bankView);
+  localStorage.setItem(STORAGE_KEYS.bankView, bankView);
   renderAll();
   setStorageStatus("Modo Local");
 }
@@ -1430,7 +1442,7 @@ function handleMidiMessage(event) {
   const signature = `${command.toString(16)}:${data1}`;
   if (learningAction) {
     midiMap[learningAction] = signature;
-    localStorage.setItem("midiMap", JSON.stringify(midiMap));
+    localStorage.setItem(STORAGE_KEYS.midiMap, JSON.stringify(midiMap));
     learningAction = null;
     renderMidiMap();
     return;
@@ -1457,12 +1469,7 @@ function escapeHtml(value) {
 }
 
 function parseStoredAudioOutput() {
-  try {
-    return JSON.parse(localStorage.getItem("audioOutput") || "{}");
-  } catch {
-    localStorage.removeItem("audioOutput");
-    return {};
-  }
+  return readJsonStorage(STORAGE_KEYS.audioOutput, {}, isPlainObject).value;
 }
 
 function detectAudioOutputSupport() {
@@ -1477,7 +1484,7 @@ function detectAudioOutputSupport() {
 
 function saveAudioOutputPreference() {
   localStorage.setItem(
-    "audioOutput",
+    STORAGE_KEYS.audioOutput,
     JSON.stringify({
       id: audioOutputState.selectedId,
       label: audioOutputState.selectedLabel,
@@ -1654,12 +1661,12 @@ function bindEvents() {
   });
   el.bankActiveView?.addEventListener("click", () => {
     bankView = "active";
-    localStorage.setItem("bankView", bankView);
+    localStorage.setItem(STORAGE_KEYS.bankView, bankView);
     renderSongBank();
   });
   el.bankArchivedView?.addEventListener("click", () => {
     bankView = "archived";
-    localStorage.setItem("bankView", bankView);
+    localStorage.setItem(STORAGE_KEYS.bankView, bankView);
     renderSongBank();
   });
   el.songForm.addEventListener("submit", saveFormSong);
@@ -1676,8 +1683,9 @@ function bindEvents() {
     }
     songs = await getActiveSongs();
     setlistOrder = setlistOrder.filter((id) => id !== archivedId);
+    saveSetlistOrder();
     closeEditForm();
-    selectedId = setlistOrder[0] || songs[0]?.id || null;
+    selectedId = setlistOrder[0] || null;
     if (selectedId) applySong(selectedId);
     else renderAll();
     setStorageStatus("Modo Local");
@@ -1746,8 +1754,8 @@ async function init() {
   if (!songs.length && !navigator.onLine) await ensureSeedData();
   reconcileSetlistOrder();
   closeEditForm();
-  if (setlistOrder[0] || songs[0]?.id) {
-    applySong(setlistOrder[0] || songs[0]?.id);
+  if (setlistOrder[0]) {
+    applySong(setlistOrder[0]);
   } else {
     renderAll();
   }
