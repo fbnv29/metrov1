@@ -184,7 +184,8 @@ class AudioMetronome {
     this.pendingCommitTimer = null;
     this.outputDeviceId = audioOutputState.selectedId;
     this.masterGain = null;
-    this.compressor = null;
+    this.limiter = null;
+    this.transientBuffer = null;
   }
 
   async init() {
@@ -211,15 +212,12 @@ class AudioMetronome {
 
   createOutputBus() {
     this.masterGain = this.ctx.createGain();
-    this.compressor = this.ctx.createDynamicsCompressor();
-    this.masterGain.gain.value = 0.86;
-    this.compressor.threshold.value = -18;
-    this.compressor.knee.value = 8;
-    this.compressor.ratio.value = 3;
-    this.compressor.attack.value = 0.002;
-    this.compressor.release.value = 0.07;
-    this.masterGain.connect(this.compressor);
-    this.compressor.connect(this.ctx.destination);
+    this.limiter = this.ctx.createWaveShaper();
+    this.masterGain.gain.value = 0.74;
+    this.limiter.curve = this.createLimiterCurve();
+    this.limiter.oversample = "2x";
+    this.masterGain.connect(this.limiter);
+    this.limiter.connect(this.ctx.destination);
   }
 
   canSelectOutput() {
@@ -385,6 +383,56 @@ class AudioMetronome {
       () => this.releaseScheduledClick(click),
       Math.max(0, (endTime - this.ctx.currentTime) * 1000) + 120,
     );
+
+    if (accent === 2) {
+      this.playAccentTransient(time);
+    }
+  }
+
+  playAccentTransient(time) {
+    const source = this.ctx.createBufferSource();
+    const filter = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+    const endTime = time + 0.012;
+
+    source.buffer = this.createTransientBuffer();
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(3200, time);
+    filter.Q.value = 0.75;
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(0.075, time + 0.0016);
+    gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
+    gain.gain.setValueAtTime(0, endTime + 0.004);
+
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain || this.ctx.destination);
+    const click = this.trackScheduledClick([source, filter, gain]);
+    source.start(time);
+    source.stop(endTime + 0.006);
+    source.onended = () => this.releaseScheduledClick(click);
+    click.cleanupTimer = window.setTimeout(
+      () => this.releaseScheduledClick(click),
+      Math.max(0, (endTime - this.ctx.currentTime) * 1000) + 90,
+    );
+  }
+
+  createTransientBuffer() {
+    if (this.transientBuffer) return this.transientBuffer;
+    const length = Math.max(1, Math.round(this.ctx.sampleRate * 0.012));
+    const buffer = this.ctx.createBuffer(1, length, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let index = 0; index < length; index += 1) {
+      const t = index / this.ctx.sampleRate;
+      const envelope = Math.exp(-index / (this.ctx.sampleRate * 0.0038));
+      const body = Math.sin(2 * Math.PI * 3200 * t) * 0.72;
+      const edge = Math.sin(2 * Math.PI * 5100 * t) * 0.28;
+      data[index] = (body + edge) * envelope;
+    }
+
+    this.transientBuffer = buffer;
+    return buffer;
   }
 
   createSoftClipCurve() {
@@ -396,6 +444,20 @@ class AudioMetronome {
       curve[index] = Math.tanh(0.95 * x);
     }
     this.softClipCurve = curve;
+    return curve;
+  }
+
+  createLimiterCurve() {
+    const samples = 1024;
+    const curve = new Float32Array(samples);
+    const drive = 1.4;
+    const normalizer = Math.tanh(drive);
+
+    for (let index = 0; index < samples; index += 1) {
+      const x = (index / (samples - 1)) * 2 - 1;
+      curve[index] = Math.tanh(drive * x) / normalizer;
+    }
+
     return curve;
   }
 

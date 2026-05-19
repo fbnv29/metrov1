@@ -1212,7 +1212,7 @@ h2 {
   position: relative;
   display: grid;
   grid-template-columns: 1fr;
-  min-height: 60px;
+  min-height: 84px;
   align-items: center;
   overflow: hidden;
   border: 1px solid rgba(244, 241, 234, 0.08);
@@ -1231,7 +1231,7 @@ h2 {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  min-height: 60px;
+  min-height: 84px;
   border-radius: inherit;
   background: inherit;
   transition: transform 160ms ease;
@@ -1277,19 +1277,19 @@ h2 {
   gap: 14px;
   align-items: center;
   width: 100%;
-  min-height: 60px;
+  min-height: 84px;
   border: 0;
   background: transparent;
   box-shadow: none;
   text-align: left;
-  padding: 10px 54px 10px 8px;
+  padding: 14px 58px 14px 8px;
 }
 
 .song-remove {
   position: absolute;
-  top: 9px;
+  top: 14px;
   right: 8px;
-  bottom: 9px;
+  bottom: 14px;
   z-index: 2;
   width: 38px;
   min-height: 0;
@@ -1315,13 +1315,21 @@ h2 {
   display: block;
   font-weight: 700;
   font-size: clamp(1rem, 1.35vw, 1.25rem);
-  line-height: 1.05;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
 }
 
 .song-artist,
 .song-meta {
   color: var(--muted);
   font-size: clamp(0.85rem, 1.1vw, 1rem);
+}
+
+.song-artist {
+  display: block;
+  margin-top: 4px;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
 }
 
 .song-meta {
